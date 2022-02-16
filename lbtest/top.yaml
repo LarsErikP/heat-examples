@@ -1,0 +1,73 @@
+heat_template_version: 2018-08-31
+
+description: Testing testing
+
+resources:
+  test_network:
+    type: OS::Neutron::Net
+    properties:
+      name: test_network
+
+  test_subnet_v4:
+    type: OS::Neutron::Subnet
+    properties:
+      name: test_subnet_v4
+      network: { get_resource: test_network }
+      cidr: 192.168.0.0/24
+      gateway_ip: 192.168.0.1
+      allocation_pools:
+        - start: 192.168.0.100
+          end: 192.168.0.254
+
+  test_router:
+    type: OS::Neutron::Router
+    properties:
+      external_gateway_info:
+        network: ntnu-internal
+
+  test_router_interface_v4:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router_id: { get_resource: test_router }
+      subnet_id: { get_resource: test_subnet_v4 }
+
+  servers:
+    type: OS::Heat::ResourceGroup
+    properties:
+      count: 3
+      resource_def:
+        type: lbmember.yaml
+        properties:
+          server_name: server_%index%
+          network_name: { get_resource: test_network }
+          lb_pool_name: { get_resource: test_lb_pool }
+
+  test_lb:
+    type: OS::Octavia::LoadBalancer
+    properties:
+      vip_subnet: { get_resource: test_subnet_v4 }
+      flavor: Regular
+
+  test_lb_pool:
+    type: OS::Octavia::Pool
+    properties:
+      lb_algorithm: ROUND_ROBIN
+      protocol: TCP
+      loadbalancer: { get_resource: test_lb }
+
+  test_lb_listener:
+    type: OS::Octavia::Listener
+    properties:
+      protocol: TCP
+      protocol_port: 22
+      loadbalancer: { get_resource: test_lb }
+      default_pool: { get_resource: test_lb_pool }
+
+  test_lb_hm:
+    type: OS::Octavia::HealthMonitor
+    properties:
+      delay: 5
+      max_retries: 3
+      timeout: 5
+      type: TCP
+      pool: { get_resource: test_lb_pool }

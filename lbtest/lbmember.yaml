@@ -1,0 +1,34 @@
+heat_template_version: 2018-08-31
+
+description: >
+  HOT for a Linux server that will add itself to a loadbalancer
+
+parameters:
+  server_name:
+    type: string
+    description: Name of server
+  network_name:
+    type: string
+    description: Name of network
+  lb_pool_name:
+    type: string
+    description: Name of LB pool
+
+resources:
+  server:
+    type: OS::Nova::Server
+    properties:
+      name: { get_param: server_name }
+      image: Ubuntu Server 20.04 LTS (Focal Fossa) amd64
+      flavor: t1.large
+      key_name: larserik-helene
+      networks:
+        - network: { get_param: network_name }
+      security_groups: [ default ]
+
+  poolmember:
+    type: OS::Octavia::PoolMember
+    properties:
+      address: { get_attr: [ server, first_address ] }
+      pool: { get_param: lb_pool_name }
+      protocol_port: 22
